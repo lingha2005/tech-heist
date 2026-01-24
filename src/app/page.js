@@ -16,6 +16,7 @@ export default function Home() {
   // TIMER STATES
   const [startedAt, setStartedAt] = useState(null);
   const [pausedAt, setPausedAt] = useState(null);
+  const [finishedAt, setFinishedAt] = useState(null); // NEW: To freeze timer
   const [totalPaused, setTotalPaused] = useState(0);
 
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -24,9 +25,12 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // --- CUSTOM COMPILER STATE (Moved to Level 3) ---
+  // --- ANIMATION STATE (LEVEL 3) ---
+  const [flashIndex, setFlashIndex] = useState(0);
+
+  // --- CUSTOM COMPILER STATE (LEVEL 2) ---
   const [code, setCode] = useState(`# ==========================================================
-# TECH HEIST : LEVEL 3
+# TECH HEIST : LEVEL 2
 # Smart City Autonomous Water Distribution Core
 # ==========================================================
 
@@ -118,29 +122,40 @@ print("END OF CONTROL SESSION")`);
 
   const [consoleOutput, setConsoleOutput] = useState("Ready to run...");
 
-  // --- CLOCK ---
+  // --- CLOCK & ANIMATION ---
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    // Level 3 Flash Animation
+    let flashTimer;
+    if (currentLevel === 3) {
+      flashTimer = setInterval(() => {
+        setFlashIndex((prev) => (prev + 1) % 4);
+      }, 1000);
+    }
+    return () => {
+      clearInterval(timer);
+      if (flashTimer) clearInterval(flashTimer);
+    };
+  }, [currentLevel]);
 
-  // --- REALTIME TEAM LISTENER ---
+  // --- REALTIME LISTENER ---
   useEffect(() => {
     if (!teamId) return;
-
     const teamRef = doc(db, 'teams', teamId);
     const unsub = onSnapshot(teamRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setPausedAt(data.pausedAt || null);
         setTotalPaused(data.totalPaused || 0);
+        setFinishedAt(data.finishedAt || null); // Listen for finish time
+        // Safety: If level changed remotely (rare), sync it
+        if (data.currentLevel > currentLevel) setCurrentLevel(data.currentLevel);
       }
     });
-
     return () => unsub();
-  }, [teamId]);
+  }, [teamId, currentLevel]);
 
-  // --- LOGIN LOGIC ---
+  // --- LOGIN ---
   const handleLogin = async () => {
     if (!teamName || !teamPassword) return;
     setLoading(true); setLoginError('');
@@ -148,8 +163,7 @@ print("END OF CONTROL SESSION")`);
     try {
       if (teamPassword !== 'BME2026') {
         setLoginError('>> ERROR: INVALID ACCESS CODE.');
-        setLoading(false);
-        return;
+        setLoading(false); return;
       }
 
       const id = teamName.trim().toUpperCase().replace(/\s+/g, '_');
@@ -166,13 +180,14 @@ print("END OF CONTROL SESSION")`);
         let dbStart = data.startedAt;
         if (dbStart && dbStart.seconds) dbStart = dbStart.seconds * 1000;
         setStartedAt(dbStart || now);
+        
         setPausedAt(data.pausedAt || null);
         setTotalPaused(data.totalPaused || 0);
+        setFinishedAt(data.finishedAt || null);
         
         setIsLoggedIn(true);
-        
-        // Show intro for Level 1 or Level 3 (Compiler)
-        if ((data.currentLevel === 1 && !data.level1_seen) || (data.currentLevel === 3 && !data.level3_seen)) {
+        // Intro triggers
+        if ((data.currentLevel === 1 && !data.level1_seen) || (data.currentLevel === 2 && !data.level2_seen) || (data.currentLevel === 3 && !data.level3_seen)) {
            setShowIntro(true);
         }
       } else {
@@ -182,20 +197,15 @@ print("END OF CONTROL SESSION")`);
           startedAt: now,
           pausedAt: null,
           totalPaused: 0,
+          finishedAt: null,
           level1_seen: false,
+          level2_seen: false,
           level3_seen: false
         });
-        setCurrentLevel(1); 
-        setStartedAt(now);
-        setPausedAt(null);
-        setTotalPaused(0);
-        setShowIntro(true); 
-        setIsLoggedIn(true);
+        setCurrentLevel(1); setStartedAt(now); setPausedAt(null); setTotalPaused(0); setFinishedAt(null);
+        setShowIntro(true); setIsLoggedIn(true);
       }
-    } catch (error) { 
-      console.error(error); 
-      setLoginError('>> DATABASE ERROR.'); 
-    }
+    } catch (error) { console.error(error); setLoginError('>> DATABASE ERROR.'); }
     setLoading(false);
   };
 
@@ -203,6 +213,7 @@ print("END OF CONTROL SESSION")`);
     setShowIntro(false);
     const teamRef = doc(db, 'teams', teamId);
     if (currentLevel === 1) await updateDoc(teamRef, { level1_seen: true });
+    if (currentLevel === 2) await updateDoc(teamRef, { level2_seen: true });
     if (currentLevel === 3) await updateDoc(teamRef, { level3_seen: true });
   };
 
@@ -228,52 +239,66 @@ print("END OF CONTROL SESSION")`);
 
   // --- SUBMIT LOGIC ---
   const handleSubmit = async () => {
-    if (pausedAt) { setMessage('>> SYSTEM PAUSED.'); return; }
+    if (pausedAt && !finishedAt) { setMessage('>> SYSTEM PAUSED.'); return; }
     
     const teamRef = doc(db, 'teams', teamId);
     const input = inputValue.trim();
     
-    // --- LEVEL 1: CIRCUIT ---
+    // LEVEL 1: CIRCUIT
     if (currentLevel === 1) {
       if (input === '721') {
         setMessage('>> CIRCUIT FIXED.');
-        // Advance to Level 2 (The Hunt)
-        await updateDoc(teamRef, { currentLevel: 2 });
-        setCurrentLevel(2); setInputValue(''); 
+        await updateDoc(teamRef, { currentLevel: 2, level2_seen: false });
+        setCurrentLevel(2); setInputValue(''); setShowIntro(true);
       } else { setMessage('>> ERROR: INVALID FREQUENCY.'); }
     }
-    // --- LEVEL 2: MECHANICAL DEPT HUNT (NEW!) ---
+    // LEVEL 2: COMPILER
     else if (currentLevel === 2) {
-      if (input === 'PYTH0N_M4STER') { // Code from QR at Mech Dept
-        setMessage('>> LOCATION VERIFIED. ACCESSING COMPILER...');
-        // Advance to Level 3 (Compiler)
+      if (input === 'ACCESS_GRANTED_99') {
+        setMessage('>> ACCESS GRANTED.');
         await updateDoc(teamRef, { currentLevel: 3, level3_seen: false });
         setCurrentLevel(3); setInputValue(''); setShowIntro(true);
-      } else { setMessage('>> ERROR: INVALID QR CODE.'); }
-    }
-    // --- LEVEL 3: WATER COMPILER ---
-    else if (currentLevel === 3) {
-      if (input === 'ACCESS_GRANTED_99') {
-        setMessage('>> ACCESS GRANTED. UNLOCKING NEXT NODE.');
-        // Advance to Level 4 (Library Hunt)
-        await updateDoc(teamRef, { currentLevel: 4 });
-        setCurrentLevel(4); setInputValue('');
       } else { setMessage('>> ERROR: INCORRECT KEY.'); }
     }
-    // --- LEVEL 4: LIBRARY HUNT ---
+    // LEVEL 3: BINARY CIPHER
+    else if (currentLevel === 3) {
+      // Triangle(01) -> Circle(11) -> Square(10) -> Triangle(01) = 01111001 = 121
+      if (input === '121') {
+         setMessage('>> SIGNAL DECODED.');
+         await updateDoc(teamRef, { currentLevel: 4 });
+         setCurrentLevel(4); setInputValue('');
+      } else { setMessage('>> ERROR: INCORRECT DECIMAL VALUE.'); }
+    }
+    // LEVEL 4: QR HUNT (GATEWAY TO OMEGA BOX)
     else if (currentLevel === 4) {
-      if (input === 'BINARY_GATE_OPEN') {
-         setMessage('>> SIGNAL INTERCEPTED.');
+      if (input === 'OMEGA_PROTOCOL_INIT') { // Code found at QR Location
+         setMessage('>> PROTOCOL INITIATED. OMEGA BOX LOCATION REVEALED.');
          await updateDoc(teamRef, { currentLevel: 5 });
          setCurrentLevel(5); setInputValue('');
-      } else { setMessage('>> ERROR: INVALID QR CODE.'); }
+      } else { setMessage('>> ERROR: INVALID ACCESS CODE.'); }
+    }
+    // LEVEL 5: OMEGA BOX (FINAL)
+    else if (currentLevel === 5) {
+      if (input === 'HEIST_COMPLETE_2026') { // Code INSIDE the box
+         const finishTime = Date.now();
+         await updateDoc(teamRef, { 
+           currentLevel: 6, 
+           finishedAt: finishTime 
+         });
+         setFinishedAt(finishTime);
+         setCurrentLevel(6);
+      } else { setMessage('>> ERROR: INVALID FINAL CODE.'); }
     }
   };
 
   const getDisplayTime = () => {
     if (!startedAt) return "00:00:00";
     let startMillis = typeof startedAt === 'object' && startedAt.seconds ? startedAt.seconds * 1000 : startedAt;
-    let endPoint = pausedAt || currentTime;
+    
+    // STOP TIMER LOGIC:
+    // If finished, use finishedAt. If paused, use pausedAt. Otherwise, use now.
+    let endPoint = finishedAt || pausedAt || currentTime;
+    
     let elapsed = endPoint - startMillis - totalPaused;
     if (elapsed < 0) elapsed = 0;
     
@@ -288,9 +313,10 @@ print("END OF CONTROL SESSION")`);
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
         <h1>// TECH-HEIST //</h1>
         {isLoggedIn && (
-          <div style={{ textAlign: 'right', fontFamily: 'monospace', color: pausedAt ? '#ff3333' : '#00ff41' }}>
+          <div style={{ textAlign: 'right', fontFamily: 'monospace', color: finishedAt ? '#00ff41' : (pausedAt ? '#ff3333' : '#00ff41') }}>
             TIME: {getDisplayTime()}
-            {pausedAt && <div style={{ fontSize: '0.8rem' }}>[PAUSED]</div>}
+            {pausedAt && !finishedAt && <div style={{ fontSize: '0.8rem' }}>[PAUSED]</div>}
+            {finishedAt && <div style={{ fontSize: '0.8rem' }}>[MISSION COMPLETE]</div>}
           </div>
         )}
       </div>
@@ -309,11 +335,18 @@ print("END OF CONTROL SESSION")`);
         <div style={{ animation: 'fadeIn 0.5s' }}>
           <h2 style={{ borderBottom: '1px solid #00ff41', paddingBottom: '10px' }}> MISSION BRIEFING</h2>
           {currentLevel === 1 && <p>Fix the circuit to get the buzzer code.</p>}
-          {currentLevel === 3 && (
+          {currentLevel === 2 && (
             <>
               <p><strong>OBJECTIVE: SMART CITY WATER TERMINAL</strong></p>
               <p>The core logic for the city's water distribution is corrupted.</p>
               <p>You must restore the Python logic to ensure the valve opens ONLY when safe.</p>
+            </>
+          )}
+          {currentLevel === 3 && (
+            <>
+              <p><strong>OBJECTIVE: DATA TRANSLATION</strong></p>
+              <p>We are receiving an encrypted binary transmission.</p>
+              <p><strong>MISSION:</strong> Find the Decoder Sheet at the <strong>Library</strong> and translate the signal.</p>
             </>
           )}
           <button onClick={startMission} style={{ marginTop: '20px' }}>  START </button>
@@ -323,13 +356,14 @@ print("END OF CONTROL SESSION")`);
       {isLoggedIn && !showIntro && (
         <div style={{ animation: 'fadeIn 0.5s' }}>
           <div style={{ marginBottom: '20px', opacity: 0.8 }}>
-             OPERATIVE: {teamName.toUpperCase()} | LEVEL: {currentLevel}
+             OPERATIVE: {teamName.toUpperCase()} | LEVEL: {currentLevel === 6 ? 'COMPLETE' : currentLevel}
           </div>
 
-          {pausedAt ? (
+          {pausedAt && !finishedAt ? (
             <div className="clue-box" style={{ borderColor: '#ff3333', color: '#ff3333' }}>⚠ SYSTEM PAUSED ⚠</div>
           ) : (
             <>
+              {/* LEVEL 1: CIRCUIT */}
               {currentLevel === 1 && (
                 <div>
                   <p> ENTER BUZZER CODE:</p>
@@ -338,22 +372,8 @@ print("END OF CONTROL SESSION")`);
                 </div>
               )}
 
-              {/* === LEVEL 2: MECHANICAL DEPT HUNT === */}
+              {/* LEVEL 2: COMPILER */}
               {currentLevel === 2 && (
-                <div>
-                  <div className="clue-box">
-                    <strong> INTERCEPTED LOCATION DATA:</strong><br/><br/>
-                    "Where the oldest tree meets the newest gears."<br/>
-                    <em>(Go to this location. Find the QR Code.)</em>
-                  </div>
-                  <p> ENTER QR ACCESS CODE:</p>
-                  <input type="text" placeholder="Ex: PYTH0N_..." value={inputValue} onChange={e=>setInputValue(e.target.value)} />
-                  <button onClick={handleSubmit}>VERIFY LOCATION</button>
-                </div>
-              )}
-
-              {/* === LEVEL 3: COMPILER === */}
-              {currentLevel === 3 && (
                 <div>
                    <div className="clue-box" style={{ marginBottom: '20px', fontSize: '0.9rem', lineHeight: '1.5' }}>
                       <strong style={{ borderBottom: '1px solid #00ff41' }}>SMART CITY WATER DISTRIBUTION CONTROL TERMINAL</strong><br/><br/>
@@ -392,15 +412,72 @@ print("END OF CONTROL SESSION")`);
                 </div>
               )}
 
-               {currentLevel === 4 && (
+               {/* LEVEL 3: BINARY CIPHER */}
+               {currentLevel === 3 && (
+                <div>
+                  <div className="clue-box" style={{ marginBottom: '20px' }}>
+                    <strong> INTERCEPTING SIGNAL...</strong><br/>
+                    "Go to the <strong>Library</strong>. Find the Physical Decoder Sheet to translate the sequence below."
+                  </div>
+                  
+                  <div style={{ 
+                    display: 'flex', justifyContent: 'center', gap: '20px', margin: '40px 0', background: '#000', padding: '20px', border: '1px dashed #00ff41'
+                  }}>
+                    {['TRIANGLE', 'CIRCLE', 'SQUARE', 'TRIANGLE'].map((shape, index) => (
+                      <div key={index} style={{
+                        width: '80px', height: '80px', border: '2px solid #00ff41', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: flashIndex === index ? 1 : 0.2, boxShadow: flashIndex === index ? '0 0 20px #00ff41' : 'none',
+                        transition: 'opacity 0.1s', fontSize: '40px'
+                      }}>
+                        {shape === 'TRIANGLE' && '▲'}
+                        {shape === 'CIRCLE' && '●'}
+                        {shape === 'SQUARE' && '■'}
+                      </div>
+                    ))}
+                  </div>
+
+                  <p> ENTER DECODED DECIMAL VALUE:</p>
+                  <input type="number" placeholder="___" value={inputValue} onChange={e=>setInputValue(e.target.value)} />
+                  <button onClick={handleSubmit}>VERIFY CODE</button>
+                </div>
+              )}
+
+              {/* LEVEL 4: OMEGA GATEWAY (QR HUNT) */}
+              {currentLevel === 4 && (
                 <div>
                   <div className="clue-box">
-                    "Find the room where silence is mandatory."<br/>
-                    <em>(Find QR Code at Library)</em>
+                    <strong> SIGNAL DECODED. COORDINATES REVEALED.</strong><br/><br/>
+                    "Where the silicon meets the coffee."<br/>
+                    <em>(Go to the Cafeteria. Find the QR Code.)</em>
                   </div>
-                  <p> ENTER QR CODE:</p>
-                  <input type="text" placeholder="Ex: BINARY_..." value={inputValue} onChange={e=>setInputValue(e.target.value)} />
-                  <button onClick={handleSubmit}>VERIFY</button>
+                  <p> ENTER OMEGA ACCESS CODE:</p>
+                  <input type="text" placeholder="Ex: OMEGA_..." value={inputValue} onChange={e=>setInputValue(e.target.value)} />
+                  <button onClick={handleSubmit}>UNLOCK OMEGA BOX</button>
+                </div>
+              )}
+
+              {/* LEVEL 5: OMEGA BOX (FINAL) */}
+              {currentLevel === 5 && (
+                <div>
+                  <div className="clue-box" style={{ border: '2px solid #fff', boxShadow: '0 0 20px #fff', color: '#fff' }}>
+                    <strong> FINAL OBJECTIVE INITIATED</strong><br/><br/>
+                    "The Omega Box is located at the Main Stage."<br/>
+                    <em>(Find the box. Open it. Enter the code inside to STOP THE TIMER.)</em>
+                  </div>
+                  <p> ENTER FINAL COMPLETION CODE:</p>
+                  <input type="text" placeholder="HEIST_..." value={inputValue} onChange={e=>setInputValue(e.target.value)} />
+                  <button onClick={handleSubmit} style={{ background: '#fff', color: '#000' }}>STOP TIMER</button>
+                </div>
+              )}
+
+              {/* LEVEL 6: VICTORY */}
+              {currentLevel === 6 && (
+                <div style={{ textAlign: 'center', animation: 'fadeIn 1s' }}>
+                  <h1 style={{ fontSize: '3rem', color: '#fff', textShadow: '0 0 20px #00ff41' }}>MISSION COMPLETE</h1>
+                  <div style={{ fontSize: '2rem', margin: '20px 0', fontFamily: 'monospace' }}>
+                    FINAL TIME: <span style={{ color: '#00ff41' }}>{getDisplayTime()}</span>
+                  </div>
+                  <p>System breached. Report to Admin for ranking.</p>
                 </div>
               )}
 

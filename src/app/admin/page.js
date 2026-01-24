@@ -9,12 +9,12 @@ export default function AdminDashboard() {
   const [deletePwd, setDeletePwd] = useState('');
 
   // Helper to check if the system is currently "Paused"
-  // (We check if the first team has a 'pausedAt' timestamp)
   const isSystemPaused = teams.length > 0 && teams[0].pausedAt != null;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
 
+    // Sort teams by Level (Descending) first, then by Finish Time/Start Time could be added
     const q = query(collection(db, 'teams'), orderBy('currentLevel', 'desc'));
     const unsubscribeTeams = onSnapshot(q, (snapshot) => {
       setTeams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -32,21 +32,20 @@ export default function AdminDashboard() {
     const q = query(collection(db, 'teams'));
     const snapshot = await getDocs(q);
 
-    // If currently paused, we want to RESUME. If running, we want to PAUSE.
-    // We use the 'isSystemPaused' check to decide the action for everyone.
     const shouldPause = !isSystemPaused; 
 
     const updates = snapshot.docs.map(async (teamDoc) => {
       const data = teamDoc.data();
       const ref = teamDoc.ref;
 
+      // Don't pause teams that have already finished
+      if (data.finishedAt) return;
+
       if (shouldPause) {
-        // PAUSE EVERYONE
         if (!data.pausedAt) { 
             await updateDoc(ref, { pausedAt: now }); 
         }
       } else {
-        // RESUME EVERYONE
         if (data.pausedAt) {
           const pauseDuration = now - data.pausedAt;
           await updateDoc(ref, {
@@ -77,15 +76,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- TIMER DISPLAY ---
-  const getTeamTime = (startedAt, pausedAt, totalPaused) => {
+  // --- TIMER DISPLAY LOGIC (UPDATED) ---
+  const getTeamTime = (startedAt, pausedAt, totalPaused, finishedAt) => {
     if (!startedAt) return "00:00:00";
 
-    const now = currentTime;
-    let elapsed = now - startedAt - (totalPaused || 0);
+    // 1. Determine the "End Point" for the calculation
+    // If Finished: Stop at finish time.
+    // If Paused: Stop at pause time.
+    // Otherwise: Use current live time.
+    let endPoint = finishedAt || pausedAt || currentTime;
 
-    // If currently paused, don't count the time since the pause started
-    if (pausedAt) elapsed -= (now - pausedAt);
+    // 2. Calculate raw elapsed time
+    let elapsed = endPoint - startedAt - (totalPaused || 0);
+
+    // 3. Safety check
     if (elapsed < 0) elapsed = 0;
 
     const seconds = Math.floor((elapsed / 1000) % 60);
@@ -100,14 +104,12 @@ export default function AdminDashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #00ff41', paddingBottom: '20px' }}>
         <h1>// MISSION CONTROL //</h1>
         
-        {/* THE BUTTON: DYNAMIC COLOR */}
         <button 
           onClick={togglePause}
           style={{
             padding: '15px 30px',
             fontSize: '1.2rem',
             fontWeight: 'bold',
-            // Turn RED if paused, GREEN if running
             background: isSystemPaused ? '#ff3333' : '#00ff41', 
             color: 'black',
             border: 'none',
@@ -119,7 +121,6 @@ export default function AdminDashboard() {
         </button>
       </div>
       
-      {/* STATUS BANNER */}
       {isSystemPaused && (
         <div style={{ background: '#ff3333', color: 'black', textAlign: 'center', padding: '10px', marginTop: '20px', fontWeight: 'bold' }}>
           ⚠ EVENT PAUSED - TIMERS FROZEN ⚠
@@ -131,21 +132,36 @@ export default function AdminDashboard() {
           <tr style={{ borderBottom: '1px solid #333', textAlign: 'left', color: '#888' }}>
             <th style={{ padding: '10px' }}>RANK</th>
             <th style={{ padding: '10px' }}>OPERATIVE</th>
-            <th style={{ padding: '10px' }}>ACTIVE TIME</th>
-            <th style={{ padding: '10px' }}>LEVEL</th>
+            <th style={{ padding: '10px' }}>FINAL TIME</th>
+            <th style={{ padding: '10px' }}>STATUS</th>
           </tr>
         </thead>
         <tbody>
-          {teams.map((team, index) => (
-            <tr key={team.id} style={{ borderBottom: '1px solid #222' }}>
-              <td style={{ padding: '15px' }}>#{index + 1}</td>
-              <td style={{ padding: '15px', fontWeight: 'bold' }}>{team.name}</td>
-              <td style={{ padding: '15px', fontFamily: 'monospace', color: team.pausedAt ? '#ff3333' : '#00ff41' }}>
-                {getTeamTime(team.startedAt, team.pausedAt, team.totalPaused)}
-              </td>
-              <td style={{ padding: '15px' }}>LVL {team.currentLevel}</td>
-            </tr>
-          ))}
+          {teams.map((team, index) => {
+            // Determine row color based on status
+            let timeColor = '#00ff41';
+            let statusText = `LVL ${team.currentLevel}`;
+            
+            if (team.finishedAt) {
+                timeColor = '#fff'; // White for finished
+                statusText = '🏆 MISSION COMPLETE';
+            } else if (team.pausedAt) {
+                timeColor = '#ff3333'; // Red for paused
+            }
+
+            return (
+              <tr key={team.id} style={{ borderBottom: '1px solid #222', background: team.finishedAt ? 'rgba(255, 255, 255, 0.1)' : 'transparent' }}>
+                <td style={{ padding: '15px' }}>#{index + 1}</td>
+                <td style={{ padding: '15px', fontWeight: 'bold' }}>{team.name}</td>
+                <td style={{ padding: '15px', fontFamily: 'monospace', fontSize: '1.2rem', color: timeColor }}>
+                  {getTeamTime(team.startedAt, team.pausedAt, team.totalPaused, team.finishedAt)}
+                </td>
+                <td style={{ padding: '15px', fontWeight: team.finishedAt ? 'bold' : 'normal' }}>
+                  {statusText}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
