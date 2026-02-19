@@ -600,7 +600,7 @@ print("END OF CONTROL SESSION")`);
                         "Physical components secured. Access the virtual circuit below and debug it.
                         The circuit doesn’t speak in words. It speaks in pulses. Listen carefully for exactly 60 seconds…The rhythm is your key."<br/><br/>
                         <a 
-                          href="https://www.tinkercad.com/things/3pnxJwAFLmx-brave-lahdi/editel?returnTo=https%3A%2F%2Fwww.tinkercad.com%2Fdashboard&sharecode=DorYvwPPZl5s1DR5wQZInJObiER7EeDy8A1nXYPDAm0" 
+                          href="https://www.tinkercad.com/things/9Q2cpTGGrUy-tech-heist?sharecode=KF5jUWzj9RgdGiyorHgYSoWmqI2VEDyp1V4qf5TrnZ4" 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           style={{ color: '#00ff41', textDecoration: 'underline', fontWeight: 'bold' }}
