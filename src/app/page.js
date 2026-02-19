@@ -9,6 +9,7 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  const [showMap, setShowMap] = useState(false); // NEW: Map Modal State
   
   const [teamName, setTeamName] = useState('');
   const [teamPassword, setTeamPassword] = useState('');
@@ -35,9 +36,7 @@ export default function Home() {
   // --- ANIMATION STATE ---
   const [flashIndex, setFlashIndex] = useState(0);
 
-  // --- SLIDING PUZZLE STATE (UPGRADED DIFFICULTY) ---
-  // 0 represents the empty space. Solved state: [1, 2, 3, 4, 5, 6, 7, 8, 0]
-  // Current starting state is a verified 12-move solve.
+  // --- SLIDING PUZZLE STATE ---
   const [puzzle, setPuzzle] = useState([4, 1, 2, 6, 0, 5, 7, 8, 3]);
   const isPuzzleSolved = JSON.stringify(puzzle) === JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8, 0]);
 
@@ -251,7 +250,6 @@ print("END OF CONTROL SESSION")`);
     if (isPuzzleSolved) return;
     const emptyIndex = puzzle.indexOf(0);
     
-    // Check if clicked tile is adjacent to the empty space (0)
     const isAdjacent =
       [emptyIndex - 1, emptyIndex + 1, emptyIndex - 3, emptyIndex + 3].includes(index) &&
       !(emptyIndex % 3 === 0 && index === emptyIndex - 1) &&
@@ -306,7 +304,7 @@ print("END OF CONTROL SESSION")`);
          setCurrentLevel(2); setInputValue(''); 
       } else { setMessage('>> ERROR: INCORRECT DECIMAL SEQUENCE.'); }
     }
-    // LEVEL 2: COMPILER (Protected by Bakery Gateway)
+    // LEVEL 2: COMPILER 
     else if (currentLevel === 2) {
       if (!level2Access) {
         if (input === 'M4CHIN8_M4STER_1978') {
@@ -322,7 +320,7 @@ print("END OF CONTROL SESSION")`);
         } else { setMessage('>> ERROR: INCORRECT KEY.'); }
       }
     }
-    // LEVEL 3: TINKERCAD (Protected by Dance Mirror Gateway)
+    // LEVEL 3: TINKERCAD 
     else if (currentLevel === 3) {
       if (!level3Access) {
         if (input === 'BIO_MED_4578') {
@@ -338,7 +336,7 @@ print("END OF CONTROL SESSION")`);
         } else { setMessage('>> ERROR: INVALID FREQUENCY.'); }
       }
     }
-    // LEVEL 4: OMEGA BOX (Protected by TreesGateway)
+    // LEVEL 4: OMEGA BOX 
     else if (currentLevel === 4) {
       if (!level4Access) {
         if (input === 'OMEGA_PROTOCOL_INIT') { 
@@ -377,8 +375,20 @@ print("END OF CONTROL SESSION")`);
 
   return (
     <main className="dashboard-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <h1>// TECH-HEIST //</h1>
+      {/* HEADER WITH MAP ICON */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <h1>// TECH-HEIST //</h1>
+          {isLoggedIn && (
+            <button 
+              onClick={() => setShowMap(true)}
+              style={{ background: 'transparent', border: '1px solid #00ff41', color: '#00ff41', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontWeight: 'bold' }}
+            >
+              🗺️ MAP
+            </button>
+          )}
+        </div>
+        
         {isLoggedIn && (
           <div style={{ textAlign: 'right', fontFamily: 'monospace', color: finishedAt ? '#00ff41' : (pausedAt ? '#ff3333' : '#00ff41') }}>
             TIME: {getDisplayTime()}
@@ -407,8 +417,6 @@ print("END OF CONTROL SESSION")`);
           </h1>
           
           <div className="clue-box" style={{ margin: '0 auto 30px auto', maxWidth: '600px', textAlign: 'left', background: '#111', padding: '30px', border: '1px solid #333' }}>
-            
-            {/* HEADING & DESCRIPTION */}
             <p style={{ color: '#00ff41', fontWeight: 'bold', fontSize: '1.2rem', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '15px' }}>
               SYSTEM DIRECTIVE_
             </p>
@@ -416,7 +424,6 @@ print("END OF CONTROL SESSION")`);
               The Omega Mainframe, the core of our smart-city grid, has been compromised. As elite operatives, your mission is to track down the corrupted nodes, decipher intercepted signals, and restore the system. You must navigate both this digital terminal and the physical campus to succeed.
             </p>
             
-            {/* RULES SECTION */}
             <p style={{ color: '#00ff41', fontWeight: 'bold', marginBottom: '10px' }}>
               RULES OF ENGAGEMENT
             </p>
@@ -427,7 +434,6 @@ print("END OF CONTROL SESSION")`);
               <p><strong>(4) The Clock is God:</strong> The timer determines the final winner.</p>
             </div>
             
-            {/* WARNING SECTION */}
             <div style={{ padding: '15px', background: 'rgba(255, 51, 51, 0.1)', borderLeft: '3px solid #ff3333' }}>
               <p style={{ color: '#ff3333', fontWeight: 'bold', marginBottom: '5px' }}>
                 ⚠ WARNING
@@ -436,7 +442,6 @@ print("END OF CONTROL SESSION")`);
                 Move swiftly but safely. Running in restricted areas is prohibited. Press 'INITIALIZE SYSTEM' only when your team is ready to deploy. The clock starts immediately.
               </p>
             </div>
-
           </div>
           <button onClick={proceedFromWelcome} style={{ fontSize: '1.2rem', padding: '15px 40px', fontWeight: 'bold' }}>
              INITIALIZE SYSTEM
@@ -518,11 +523,10 @@ print("END OF CONTROL SESSION")`);
                 </div>
               )}
 
-              {/* === LEVEL 2: COMPILER (Protected by Bakery Gateway) === */}
+              {/* === LEVEL 2: COMPILER === */}
               {currentLevel === 2 && (
                 <div>
                   {!level2Access ? (
-                    // 1. The Bakery Gateway (Firewall)
                     <div>
                       <div className="clue-box">
                         <strong> SIGNAL DECODED. ACCESS CODE NEEDED FOR LEVEL 2.</strong><br/><br/>
@@ -534,7 +538,6 @@ print("END OF CONTROL SESSION")`);
                       <button onClick={handleSubmit}>BYPASS FIREWALL</button>
                     </div>
                   ) : (
-                    // 2. The Python Compiler (Unlocked)
                     <div>
                       <div className="clue-box" style={{ marginBottom: '20px', fontSize: '0.9rem', lineHeight: '1.5' }}>
                           <strong style={{ borderBottom: '1px solid #00ff41' }}>SMART CITY WATER DISTRIBUTION CONTROL TERMINAL</strong><br/><br/>
@@ -575,11 +578,10 @@ print("END OF CONTROL SESSION")`);
                 </div>
               )}
 
-              {/* === LEVEL 3: TINKERCAD CIRCUIT (Protected by Dance Mirror Gateway) === */}
+              {/* === LEVEL 3: TINKERCAD CIRCUIT === */}
               {currentLevel === 3 && (
                 <div>
                   {!level3Access ? (
-                    // 1. The Dance Mirror Gateway (Firewall)
                     <div>
                       <div className="clue-box">
                         <strong> SYSTEM LOCKED. ACCESS KEY REQUIRED.</strong><br/><br/>
@@ -592,7 +594,6 @@ print("END OF CONTROL SESSION")`);
                       <button onClick={handleSubmit}>BYPASS FIREWALL</button>
                     </div>
                   ) : (
-                    // 2. The Tinkercad Simulation (Unlocked)
                     <div>
                       <div className="clue-box" style={{ marginBottom: '20px' }}>
                         <strong> VIRTUAL HARDWARE OVERRIDE</strong><br/><br/>
@@ -615,11 +616,10 @@ print("END OF CONTROL SESSION")`);
                 </div>
               )}
 
-              {/* === LEVEL 4: OMEGA BOX (Protected by TreesGateway) === */}
+              {/* === LEVEL 4: OMEGA BOX === */}
               {currentLevel === 4 && (
                 <div>
                   {!level4Access ? (
-                    // 1. The Trees Gateway (Firewall)
                     <div>
                       <div className="clue-box">
                         <strong> SIGNAL DECODED. FINAL COORDINATES REVEALED.</strong><br/><br/>
@@ -631,7 +631,6 @@ print("END OF CONTROL SESSION")`);
                       <button onClick={handleSubmit}>UNLOCK OMEGA BOX</button>
                     </div>
                   ) : (
-                    // 2. The Omega Box (Unlocked) with Sliding Puzzle
                     <div>
                       <div className="clue-box" style={{ border: '2px solid #fff', boxShadow: '0 0 20px #fff', color: '#fff', lineHeight: '1.6' }}>
                         <strong> FINAL OBJECTIVE INITIATED</strong><br/><br/>
@@ -642,7 +641,6 @@ print("END OF CONTROL SESSION")`);
                         </em>
                       </div>
 
-                      {/* --- SLIDING PUZZLE COMPONENT --- */}
                       <div style={{ margin: '30px auto', width: 'max-content', textAlign: 'center' }}>
                         <div style={{ 
                           display: 'grid', gridTemplateColumns: 'repeat(3, 80px)', gap: '5px', 
@@ -698,6 +696,35 @@ print("END OF CONTROL SESSION")`);
               {message && <div className={message.includes('ERROR') ? 'error-msg' : ''}>{message}</div>}
             </>
           )}
+        </div>
+      )}
+
+      {/* --- MAP MODAL (OVERLAY) --- */}
+      {showMap && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+          background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', 
+          flexDirection: 'column', alignItems: 'center', justifyContent: 'center' 
+        }}>
+          <div style={{ width: '90%', maxWidth: '800px', border: '2px solid #00ff41', background: '#0d0d0d', padding: '20px', borderRadius: '10px', position: 'relative', boxShadow: '0 0 30px #00ff41' }}>
+            <button 
+              onClick={() => setShowMap(false)} 
+              style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', color: '#ff3333', border: 'none', fontSize: '1.5rem', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              ✖
+            </button>
+            <h2 style={{ color: '#00ff41', marginBottom: '20px', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+               SYSTEM MAP DIRECTORY
+            </h2>
+            
+            <div style={{ width: '100%', maxHeight: '70vh', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #555', overflowY: 'auto' }}>
+              <img 
+                src="/tech-heist-map.png" 
+                alt="KPRIET Campus Map" 
+                style={{ width: '100%', height: 'auto', objectFit: 'contain' }} 
+              />
+            </div>
+          </div>
         </div>
       )}
     </main>
